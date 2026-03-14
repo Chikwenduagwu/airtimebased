@@ -1,5 +1,16 @@
 'use strict';
 
+// ─── Constants ─────────────────────────────────────────────────────────────────
+
+const BASE_CHAIN_ID = '0x2105'; // 8453 decimal — Base Mainnet
+const BASE_CHAIN_CONFIG = {
+  chainId: BASE_CHAIN_ID,
+  chainName: 'Base',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: ['https://mainnet.base.org'],
+  blockExplorerUrls: ['https://basescan.org'],
+};
+
 // ─── API ───────────────────────────────────────────────────────────────────────
 
 const api = {
@@ -8,15 +19,21 @@ const api = {
     return r.json();
   },
   async post(path, body) {
-    const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
     return r.json();
   },
 };
 
-// ─── State ─────────────────────────────────────────────────────────────────────
+// ─── App State ─────────────────────────────────────────────────────────────────
 
 const S = {
   page: 'landing',
+  wallet: null,       // connected wallet address (lowercase)
+  chainId: null,      // current chain ID as hex string
   operators: [],
   order: null,
   payment: null,
@@ -24,32 +41,213 @@ const S = {
   quoteTimer: null,
 };
 
+// ─── DOM helpers ───────────────────────────────────────────────────────────────
+
+const $ = id => document.getElementById(id);
+const setText = (id, txt) => { const el = $(id); if (el) el.textContent = txt; };
+
+function hide(...ids) { ids.forEach(id => $(id)?.classList.add('hidden')); }
+function show(...ids) { ids.forEach(id => $(id)?.classList.remove('hidden')); }
+
 // ─── Router ────────────────────────────────────────────────────────────────────
 
 function go(name) {
-  document.querySelectorAll('.page').forEach(p => {
-    p.classList.toggle('active', p.id === 'p-' + name);
-  });
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'p-' + name));
   S.page = name;
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
-// ─── DOM helpers ───────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// WALLET LOGIC
+// ═══════════════════════════════════════════════════════════════════════════════
 
-const $ = id => document.getElementById(id);
-const show = (el, on = true) => el && (el.style.display = on ? '' : 'none');
-const setText = (id, txt) => { const el = $(id); if (el) el.textContent = txt; };
-const setHTML = (id, html) => { const el = $(id); if (el) el.innerHTML = html; };
-
-// ─── Init ──────────────────────────────────────────────────────────────────────
-
-async function init() {
-  go('landing');
-  loadOperators();
-  bindAll();
+function hasProvider() {
+  return typeof window.ethereum !== 'undefined';
 }
 
-// ─── Operators ─────────────────────────────────────────────────────────────────
+/**
+ * Main connect flow.
+ * - No MetaMask → show install modal
+ * - Has MetaMask → request accounts → check chain → update UI
+ */
+async function connectWallet() {
+  if (!hasProvider()) {
+    show('metamask-modal');
+    return;
+  }
+
+  try {
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    if (!accounts || !accounts.length) return;
+
+    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+    S.wallet = accounts[0].toLowerCase();
+    S.chainId = chainId;
+
+    if (chainId !== BASE_CHAIN_ID) {
+      // Wrong network — show warning, prompt switch, still save address
+      hide('wallet-connected');
+      show('btn-wrong-net');
+      await switchToBase();
+      return;
+    }
+
+    onWalletConnected(S.wallet);
+  } catch (err) {
+    if (err.code === 4001) return; // User rejected popup — silent
+    console.error('Connect error:', err.message);
+  }
+}
+
+/**
+ * Prompts switch to Base. If not added, adds it first.
+ */
+async function switchToBase() {
+  try {
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: BASE_CHAIN_ID }],
+    });
+    // chainChanged event fires → onChainChanged → onWalletConnected
+  } catch (err) {
+    if (err.code === 4902) {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [BASE_CHAIN_CONFIG],
+        });
+      } catch (e) {
+        console.error('Failed to add Base:', e.message);
+      }
+    }
+  }
+}
+
+/**
+ * Updates ALL wallet-aware UI across every page.
+ * Called when connection is confirmed on Base network.
+ */
+function onWalletConnected(address) {
+  S.wallet = address.toLowerCase();
+
+  // ── Nav ──
+  hide('btn-connect', 'btn-wrong-net');
+  show('wallet-connected');
+  setText('nav-wallet-addr', truncateAddr(address));
+
+  // ── Purchase form: hide "not connected" box, show green wallet display ──
+  hide('wallet-not-connected');
+  show('wallet-display');
+  setText('form-wallet-addr', address);
+
+  // ── Landing hero CTA: swap label + hide wallet icon ──
+  setText('hero-cta-label', 'Buy Airtime Now');
+  const heroIcon = $('hero-wallet-icon');
+  if (heroIcon) heroIcon.style.display = 'none';
+  setText('how-cta-label', 'Buy Airtime Now');
+
+  // ── Re-enable submit button ──
+  const btn = $('submit-btn');
+  if (btn) btn.disabled = false;
+}
+
+/**
+ * Handles chain switch events from MetaMask.
+ */
+function onChainChanged(chainId) {
+  S.chainId = chainId;
+
+  if (chainId !== BASE_CHAIN_ID) {
+    // Wrong network
+    hide('wallet-connected');
+    show('btn-wrong-net');
+    hide('wallet-display');
+    show('wallet-not-connected');
+    const btn = $('submit-btn');
+    if (btn) btn.disabled = true;
+  } else if (S.wallet) {
+    // Back on Base — restore
+    hide('btn-wrong-net');
+    onWalletConnected(S.wallet);
+  }
+}
+
+/**
+ * Handles account switch events from MetaMask.
+ */
+function onAccountsChanged(accounts) {
+  if (!accounts || !accounts.length) {
+    disconnectWallet();
+  } else {
+    S.wallet = accounts[0].toLowerCase();
+    onWalletConnected(S.wallet);
+  }
+}
+
+/**
+ * Full disconnect — clears state and resets UI everywhere.
+ */
+function disconnectWallet() {
+  S.wallet = null;
+  S.chainId = null;
+
+  // Nav
+  show('btn-connect');
+  hide('wallet-connected', 'btn-wrong-net');
+
+  // Purchase form
+  show('wallet-not-connected');
+  hide('wallet-display');
+
+  // Landing hero CTA — restore "Connect Wallet"
+  setText('hero-cta-label', 'Connect Wallet');
+  const heroIcon = $('hero-wallet-icon');
+  if (heroIcon) heroIcon.style.display = '';
+  setText('how-cta-label', 'Connect Wallet to Start');
+
+  // Disable submit
+  const btn = $('submit-btn');
+  if (btn) btn.disabled = true;
+}
+
+/**
+ * Silent check on page load — auto-reconnects if user already authorized.
+ * Uses eth_accounts (no popup, only returns already-permitted accounts).
+ */
+async function checkExistingConnection() {
+  if (!hasProvider()) return;
+  try {
+    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+    if (accounts && accounts.length) {
+      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      S.wallet = accounts[0].toLowerCase();
+      S.chainId = chainId;
+      if (chainId !== BASE_CHAIN_ID) {
+        hide('wallet-connected');
+        show('btn-wrong-net');
+      } else {
+        onWalletConnected(S.wallet);
+      }
+    }
+  } catch {}
+}
+
+/**
+ * Register MetaMask live event listeners.
+ */
+function bindWalletEvents() {
+  if (!hasProvider()) return;
+  window.ethereum.on('accountsChanged', onAccountsChanged);
+  window.ethereum.on('chainChanged', onChainChanged);
+}
+
+function truncateAddr(addr) {
+  return addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : '';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// OPERATORS & QUOTE
+// ═══════════════════════════════════════════════════════════════════════════════
 
 async function loadOperators() {
   try {
@@ -70,18 +268,12 @@ async function loadOperators() {
   } catch {}
 }
 
-// ─── Quote ─────────────────────────────────────────────────────────────────────
-
 async function fetchQuote(ngn) {
   const valEl = $('price-val');
   const skelEl = $('price-skel');
   if (!valEl) return;
 
-  if (!ngn || ngn < 50) {
-    valEl.textContent = '—';
-    valEl.classList.remove('updating');
-    return;
-  }
+  if (!ngn || ngn < 50) { valEl.textContent = '—'; valEl.classList.remove('updating'); return; }
 
   valEl.classList.add('updating');
   if (skelEl) skelEl.style.display = 'block';
@@ -89,41 +281,34 @@ async function fetchQuote(ngn) {
 
   try {
     const res = await api.get(`/api/quote?amountNGN=${ngn}`);
-    if (res.success) {
-      valEl.textContent = parseFloat(res.amountUSDC).toFixed(6);
-    } else {
-      valEl.textContent = '—';
-    }
-  } catch {
-    valEl.textContent = '—';
-  } finally {
+    valEl.textContent = res.success ? parseFloat(res.amountUSDC).toFixed(6) : '—';
+  } catch { valEl.textContent = '—'; }
+  finally {
     if (skelEl) skelEl.style.display = 'none';
     valEl.style.display = '';
     valEl.classList.remove('updating');
   }
 }
 
-// ─── Validation ────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// FORM & ORDER
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const re = {
   phone: /^\+?[1-9]\d{6,14}$/,
-  wallet: /^0x[a-fA-F0-9]{40}$/,
   txHash: /^0x[a-fA-F0-9]{64}$/,
 };
 
 function clearErrors() {
   document.querySelectorAll('.field-err').forEach(e => e.classList.remove('on'));
   document.querySelectorAll('input.err, select.err').forEach(e => e.classList.remove('err'));
-  const al = $('form-alert');
-  if (al) al.classList.remove('on');
+  $('form-alert')?.classList.remove('on');
 }
 
 function fieldErr(inputId, msg) {
-  const inp = $(inputId);
+  $(inputId)?.classList.add('err');
   const errEl = $(inputId + '-err');
-  if (inp) inp.classList.add('err');
   if (errEl) { errEl.textContent = msg; errEl.classList.add('on'); }
-  return false;
 }
 
 function showAlert(id, msg, type = 'error') {
@@ -136,47 +321,55 @@ function showAlert(id, msg, type = 'error') {
   el.className = `alert on ${type}`;
 }
 
-// ─── Form Submit ───────────────────────────────────────────────────────────────
-
 async function submitOrder(e) {
   e.preventDefault();
   clearErrors();
 
-  const phone = $('f-phone').value.trim();
-  const opId = parseInt($('op-select').value);
-  const ngn = parseFloat($('f-amount').value);
-  const wallet = $('f-wallet').value.trim();
+  // ── Wallet guards (checked before any field validation) ──
+  if (!S.wallet) {
+    showAlert('form-alert', 'Connect your wallet first — click "Connect Wallet" in the nav.');
+    return;
+  }
+  if (S.chainId !== BASE_CHAIN_ID) {
+    showAlert('form-alert', 'Switch to Base Network in MetaMask, then try again.');
+    await switchToBase();
+    return;
+  }
 
-  let ok = true;
+  const phone = $('f-phone').value.trim();
+  const opId  = parseInt($('op-select').value);
+  const ngn   = parseFloat($('f-amount').value);
+  // Wallet address is ALWAYS the connected wallet — never manually entered
+  const walletAddress = S.wallet;
+
+  let valid = true;
 
   if (!re.phone.test(phone)) {
     fieldErr('f-phone', 'Use international format, e.g. +2348012345678');
-    ok = false;
+    valid = false;
   }
   if (!opId || isNaN(opId)) {
     fieldErr('op-select', 'Please select a network');
-    ok = false;
+    valid = false;
   } else {
-    const op = $('op-select').options[$('op-select').selectedIndex];
-    const min = parseFloat(op.dataset.min || 0);
-    const max = parseFloat(op.dataset.max || 99999);
-    if (isNaN(ngn) || ngn < 50) { fieldErr('f-amount', 'Minimum is ₦50'); ok = false; }
-    else if (ngn < min) { fieldErr('f-amount', `Minimum for this network is ₦${min}`); ok = false; }
-    else if (ngn > max) { fieldErr('f-amount', `Maximum for this network is ₦${max}`); ok = false; }
-  }
-  if (!re.wallet.test(wallet)) {
-    fieldErr('f-wallet', 'Enter a valid Base wallet address (0x...)');
-    ok = false;
+    const opEl = $('op-select').options[$('op-select').selectedIndex];
+    const min = parseFloat(opEl.dataset.min || 0);
+    const max = parseFloat(opEl.dataset.max || 99999);
+    if (isNaN(ngn) || ngn < 50)  { fieldErr('f-amount', 'Minimum is ₦50'); valid = false; }
+    else if (ngn < min)           { fieldErr('f-amount', `Minimum for this network is ₦${min}`); valid = false; }
+    else if (ngn > max)           { fieldErr('f-amount', `Maximum for this network is ₦${max}`); valid = false; }
   }
 
-  if (!ok) return;
+  if (!valid) return;
 
   const btn = $('submit-btn');
   btn.disabled = true;
   btn.classList.add('loading');
 
   try {
-    const res = await api.post('/api/orders', { phoneNumber: phone, operatorId: opId, amountNGN: ngn, walletAddress: wallet });
+    const res = await api.post('/api/orders', {
+      phoneNumber: phone, operatorId: opId, amountNGN: ngn, walletAddress,
+    });
 
     if (!res.success) {
       showAlert('form-alert', res.error || 'Failed to create order. Please try again.');
@@ -188,8 +381,7 @@ async function submitOrder(e) {
     renderWaiting();
     go('waiting');
     startPoll(res.order.id);
-
-  } catch (err) {
+  } catch {
     showAlert('form-alert', 'Network error. Check your connection and try again.');
   } finally {
     btn.disabled = false;
@@ -197,7 +389,9 @@ async function submitOrder(e) {
   }
 }
 
-// ─── Waiting Page ───────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// WAITING PAGE
+// ═══════════════════════════════════════════════════════════════════════════════
 
 function renderWaiting() {
   const o = S.order;
@@ -209,8 +403,12 @@ function renderWaiting() {
   const addrEl = $('w-wallet-addr');
   if (addrEl) { addrEl.textContent = p.treasuryWallet; addrEl.dataset.full = p.treasuryWallet; }
 
-  const amtCopy = $('w-amount-copy');
-  if (amtCopy) amtCopy.dataset.val = o.amountUSDC;
+  // Show sender wallet strip
+  const strip = $('waiting-wallet-strip');
+  if (strip && S.wallet) {
+    strip.classList.remove('hidden');
+    setText('waiting-wallet-addr', truncateAddr(S.wallet));
+  }
 
   setStep(1);
   setText('tracker-status', 'Monitoring Base network for your transaction...');
@@ -226,13 +424,11 @@ function setStep(n) {
   }
 }
 
-// ─── Poll ──────────────────────────────────────────────────────────────────────
-
 function startPoll(orderId) {
   stopPoll();
   let count = 0;
   S.pollTimer = setInterval(async () => {
-    if (++count > 120) { stopPoll(); setText('tracker-status', 'Auto-check expired. Your TX may still be processing.'); return; }
+    if (++count > 120) { stopPoll(); setText('tracker-status', 'Auto-check timed out. Your TX may still be processing.'); return; }
     try {
       const res = await api.get(`/api/orders?id=${orderId}`);
       if (res.success) onStatus(res.order);
@@ -254,37 +450,30 @@ function onStatus(order) {
     FAILED: 'Something went wrong.',
     REFUNDED: 'Order failed — refund has been issued.',
   };
-  const steps = { AWAITING_PAYMENT: 1, PAYMENT_CONFIRMED: 2, PROCESSING_RELOADLY: 3, COMPLETED: 4, FAILED: 4, REFUNDED: 4 };
+  const steps = { AWAITING_PAYMENT:1, PAYMENT_CONFIRMED:2, PROCESSING_RELOADLY:3, COMPLETED:4, FAILED:4, REFUNDED:4 };
   setStep(steps[order.status] || 1);
   setText('tracker-status', msgs[order.status] || '');
-
   if (order.status === 'COMPLETED') { stopPoll(); setTimeout(() => renderSuccess(order), 600); }
   if (order.status === 'FAILED' || order.status === 'REFUNDED') { stopPoll(); setTimeout(() => renderFail(order), 600); }
 }
-
-// ─── TX Fallback ────────────────────────────────────────────────────────────────
 
 async function submitTx() {
   const hash = $('tx-input').value.trim();
   if (!re.txHash.test(hash)) { showAlert('tx-alert', 'Enter a valid 0x transaction hash'); return; }
   const orderId = S.order?.id;
   if (!orderId) return;
-
   const btn = $('tx-btn');
   btn.disabled = true;
-
   try {
     const res = await api.post('/api/confirm', { orderId, txHash: hash });
-    if (res.success) {
-      showAlert('tx-alert', 'Transaction submitted — processing...', 'success');
-    } else {
-      showAlert('tx-alert', res.error || 'Verification failed');
-    }
+    showAlert('tx-alert', res.success ? 'Transaction submitted — processing...' : (res.error || 'Verification failed'), res.success ? 'success' : 'error');
   } catch { showAlert('tx-alert', 'Network error submitting transaction'); }
   finally { btn.disabled = false; }
 }
 
-// ─── Success / Fail ─────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUCCESS / FAILURE
+// ═══════════════════════════════════════════════════════════════════════════════
 
 function renderSuccess(order) {
   setText('s-phone', order.phoneNumber);
@@ -298,13 +487,16 @@ function renderSuccess(order) {
     txEl.innerHTML = `<a href="https://basescan.org/tx/${order.blockchainTxHash}" target="_blank" rel="noopener">${short} ↗</a>`;
   }
 
+  // Show wallet on success page
+  const walletRow = $('s-wallet-row');
+  if (walletRow && S.wallet) { walletRow.style.display = ''; setText('s-wallet', truncateAddr(S.wallet)); }
+
   setText('s-reloadly', order.reloadlyTxId || '—');
   go('success');
 }
 
 function renderFail(order) {
-  setText('f-reason', order.failureReason || 'An unexpected error occurred during processing.');
-
+  setText('f-reason', order.failureReason || 'An unexpected error occurred.');
   const refEl = $('f-refund');
   if (refEl) {
     if (order.refundTxHash) {
@@ -314,88 +506,101 @@ function renderFail(order) {
       refEl.textContent = 'Refund is being processed — allow up to 5 minutes.';
     }
   }
-
   go('failure');
 }
 
-// ─── Copy ──────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// COPY
+// ═══════════════════════════════════════════════════════════════════════════════
 
 function copyText(text, btn) {
   navigator.clipboard.writeText(text).then(() => {
-    btn.classList.add('copied');
-    btn.textContent = '✓';
+    btn.classList.add('copied'); btn.textContent = '✓';
     setTimeout(() => { btn.classList.remove('copied'); btn.textContent = '⧉'; }, 2000);
   }).catch(() => {
     const t = document.createElement('textarea');
-    t.value = text;
-    document.body.appendChild(t);
-    t.select();
-    document.execCommand('copy');
-    document.body.removeChild(t);
+    t.value = text; document.body.appendChild(t); t.select();
+    document.execCommand('copy'); document.body.removeChild(t);
   });
 }
 
-// ─── Reset ─────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// RESET & BIND
+// ═══════════════════════════════════════════════════════════════════════════════
 
 function resetForm() {
-  stopPoll();
-  S.order = null;
-  S.payment = null;
-  const form = $('purchase-form');
-  if (form) form.reset();
-  clearErrors();
-  const pv = $('price-val');
-  if (pv) pv.textContent = '—';
+  stopPoll(); S.order = null; S.payment = null;
+  $('purchase-form')?.reset(); clearErrors();
+  const pv = $('price-val'); if (pv) pv.textContent = '—';
 }
 
-// ─── Bind Events ───────────────────────────────────────────────────────────────
-
 function bindAll() {
-  // Nav logo → landing
+  // Logo → landing
   document.querySelectorAll('[data-go="landing"]').forEach(el => el.addEventListener('click', () => go('landing')));
 
-  // CTA buttons → purchase
-  document.querySelectorAll('[data-go="purchase"]').forEach(el => el.addEventListener('click', () => go('purchase')));
+  // Hero CTA: connect wallet if needed, else go to purchase
+  $('hero-cta-btn')?.addEventListener('click', () => S.wallet ? go('purchase') : connectWallet());
+  $('how-cta-btn')?.addEventListener('click', () => S.wallet ? go('purchase') : connectWallet());
 
-  // Back to purchase from waiting
+  // Nav wallet buttons
+  $('btn-connect')?.addEventListener('click', connectWallet);
+  $('btn-wrong-net')?.addEventListener('click', switchToBase);
+  $('btn-disconnect')?.addEventListener('click', disconnectWallet);
+
+  // Inline connect on form (when not connected)
+  $('form-connect-btn')?.addEventListener('click', connectWallet);
+
+  // Back from waiting
   $('back-to-purchase')?.addEventListener('click', () => { stopPoll(); go('purchase'); });
 
-  // New order buttons
-  document.querySelectorAll('[data-new-order]').forEach(el => el.addEventListener('click', () => { resetForm(); go('purchase'); }));
+  // New order
+  document.querySelectorAll('[data-new-order]').forEach(el =>
+    el.addEventListener('click', () => { resetForm(); go('purchase'); })
+  );
 
-  // Form submit
+  // Form
   $('purchase-form')?.addEventListener('submit', submitOrder);
 
-  // Live quote — debounced
+  // Live quote
   $('f-amount')?.addEventListener('input', () => {
     clearTimeout(S.quoteTimer);
     S.quoteTimer = setTimeout(() => fetchQuote(parseFloat($('f-amount').value)), 380);
   });
-
   $('op-select')?.addEventListener('change', () => {
-    const v = $('f-amount')?.value;
-    if (v) fetchQuote(parseFloat(v));
+    const v = $('f-amount')?.value; if (v) fetchQuote(parseFloat(v));
   });
 
-  // TX hash submission
+  // TX fallback
   $('tx-btn')?.addEventListener('click', submitTx);
+  $('tx-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitTx(); });
 
-  // Copy wallet address
+  // Copy
   $('copy-wallet')?.addEventListener('click', function () {
     const addr = $('w-wallet-addr')?.dataset.full || $('w-wallet-addr')?.textContent;
     if (addr) copyText(addr, this);
   });
-
-  // Copy amount
   $('copy-amount')?.addEventListener('click', function () {
-    const val = this.closest('.pay-amount-row')?.querySelector('.pay-amount-val')?.textContent;
+    const val = $('w-amount')?.textContent;
     if (val) copyText(val, this);
   });
 
-  // Keyboard: Enter on TX input
-  $('tx-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitTx(); });
+  // Modal
+  $('modal-close')?.addEventListener('click', () => hide('metamask-modal'));
+  $('metamask-modal')?.addEventListener('click', e => { if (e.target === $('metamask-modal')) hide('metamask-modal'); });
 }
 
 // ─── Boot ──────────────────────────────────────────────────────────────────────
+
+async function init() {
+  go('landing');
+  bindAll();
+  bindWalletEvents();           // MetaMask live event listeners
+  await checkExistingConnection(); // Auto-reconnect silently on load
+  loadOperators();              // Background fetch
+
+  // Submit starts disabled until wallet is connected
+  const btn = $('submit-btn');
+  if (btn && !S.wallet) btn.disabled = true;
+}
 
 document.addEventListener('DOMContentLoaded', init);
