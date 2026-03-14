@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="description" content="Pay with USDC on Base, receive Nigerian airtime instantly. Crypto-powered, auto-refund protected."/>
+  <meta name="theme-color" content="#060608"/>
+  <title>CryptoAirtime — USDC → Airtime on Base</title>
+  <link rel="stylesheet" href="/css/app.css"/>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23ff2d2d'/><text x='16' y='22' text-anchor='middle' font-size='18' fill='white'>⚡</text></svg>"/>
+</head>
+<body>
+<div class="grain"></div>
+
+<!-- ══════════════════════════ NAV ══════════════════════════ -->
+<nav class="nav">
+  <div class="logo" data-go="landing">
+    <div class="logo-mark">
+      <svg viewBox="0 0 30 30" fill="none">
+        <rect width="30" height="30" rx="7" fill="#ff2d2d"/>
+        <path d="M17 4L9 16h7l-3 10 11-13h-8l4-9z" fill="white"/>
+      </svg>
+    </div>
+    <span class="logo-text">CRYPTO<em>AIRTIME</em></span>
+  </div>
+  <div class="nav-right">
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      LIVE
+    </div>
+    <div class="base-chip">
+      <div class="base-icon"></div>
+      <span class="label">Base Network</span>
+    </div>
+  </div>
+</nav>
+
+<div class="root">
+
+<!-- ══════════════════════════ LANDING ══════════════════════════ -->
+<section id="p-landing" class="page active">
+
+  <div class="hero">
+    <div class="hero-inner">
+      <div class="hero-kicker">
+        <div class="kicker-dot"></div>
+        Web3 → Web2 Payment Bridge
+      </div>
+
+      <h1>
+        BUY AIRTIME
+        <em class="line2">WITH USDC</em>
+      </h1>
+
+      <p class="hero-sub">
+        Send <strong>USDC on Base</strong>, receive airtime on any Nigerian network instantly.
+        No banks. No friction. <strong>Auto-refund</strong> if anything fails.
+      </p>
+
+      <div class="hero-cta">
+        <button class="btn-hero" data-go="purchase">
+          Buy Airtime Now
+          <span class="btn-arrow">→</span>
+        </button>
+        <p class="hero-note">MTN · Airtel · Glo · 9mobile — All networks supported</p>
+      </div>
+    </div>
+
+    <div class="proof-row">
+      <div class="proof-item">
+        <div class="proof-num">₦<span>1,250</span></div>
+        <div class="proof-label">Per USDC Rate</div>
+      </div>
+      <div class="proof-item">
+        <div class="proof-num">&lt;<span>30s</span></div>
+        <div class="proof-label">Avg Delivery</div>
+      </div>
+      <div class="proof-item">
+        <div class="proof-num"><span>100</span>%</div>
+        <div class="proof-label">Refund on Fail</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <section class="how">
+    <div class="section-label">// How it works</div>
+    <h2>Four steps.<br>One transaction.</h2>
+
+    <div class="steps-list">
+      <div class="step-item">
+        <span class="step-num">01</span>
+        <div class="step-content">
+          <h3>Enter phone &amp; select operator</h3>
+          <p>Choose the number to top up and pick your Nigerian network — MTN, Airtel, Glo or 9mobile.</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <span class="step-num">02</span>
+        <div class="step-content">
+          <h3>See the USDC equivalent</h3>
+          <p>Live conversion at ₦1,250 per USDC. No hidden fees beyond our small service markup.</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <span class="step-num">03</span>
+        <div class="step-content">
+          <h3>Send USDC to our treasury on Base</h3>
+          <p>Transfer the exact USDC amount from your wallet. We monitor the chain and confirm in ~12 seconds.</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <span class="step-num">04</span>
+        <div class="step-content">
+          <h3>Airtime delivered automatically</h3>
+          <p>We call Reloadly to credit your airtime. If anything fails, your USDC is refunded on-chain — automatically, no questions asked.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="how-cta">
+      <button class="btn-hero" data-go="purchase" style="display:inline-flex;">
+        Get Started Now
+        <span class="btn-arrow">→</span>
+      </button>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <p>CryptoAirtime &nbsp;·&nbsp; Secured by Base Network &nbsp;·&nbsp; Powered by Reloadly &nbsp;·&nbsp; Auto-refund on failure</p>
+  </footer>
+</section>
+
+<!-- ══════════════════════════ PURCHASE ══════════════════════════ -->
+<section id="p-purchase" class="page">
+  <div class="form-page">
+    <div class="form-shell">
+
+      <div class="form-head">
+        <button class="back-btn" data-go="landing">← Back</button>
+        <h1>BUY <em>AIRTIME</em></h1>
+        <p>Pay with USDC on Base · Auto-refund protection</p>
+      </div>
+
+      <div id="form-alert" class="alert error">
+        <span class="alert-icon">⚠</span>
+        <span class="alert-msg"></span>
+      </div>
+
+      <form id="purchase-form" novalidate autocomplete="off">
+        <div class="form-card">
+          <div class="form-card-inner">
+
+            <!-- Phone -->
+            <div class="form-group">
+              <label for="f-phone">Recipient Phone Number</label>
+              <div class="input-wrap">
+                <input type="tel" id="f-phone" placeholder="+2348012345678" maxlength="16"/>
+              </div>
+              <div class="field-err" id="f-phone-err"></div>
+            </div>
+
+            <!-- Operator -->
+            <div class="form-group">
+              <label for="op-select">Network Operator</label>
+              <select id="op-select">
+                <option value="">Loading networks...</option>
+              </select>
+              <div class="field-err" id="op-select-err"></div>
+            </div>
+
+            <!-- Amount -->
+            <div class="form-group">
+              <label for="f-amount">Airtime Amount (NGN)</label>
+              <div class="input-wrap">
+                <span class="input-prefix">₦</span>
+                <input type="number" id="f-amount" class="has-prefix" placeholder="500" min="50" max="50000" step="50"/>
+              </div>
+              <div class="field-err" id="f-amount-err"></div>
+            </div>
+
+            <!-- USDC price strip -->
+            <div class="price-strip">
+              <span class="price-label">You Pay</span>
+              <div class="price-right">
+                <div id="price-skel" class="price-skeleton"></div>
+                <span id="price-val" class="price-val">—</span>
+                <span class="price-unit">USDC</span>
+              </div>
+            </div>
+
+            <!-- Wallet -->
+            <div class="form-group" style="margin-top:22px;">
+              <label for="f-wallet">Your Base Wallet Address</label>
+              <div class="input-wrap">
+                <input type="text" id="f-wallet" placeholder="0x..." spellcheck="false"/>
+              </div>
+              <div class="field-err" id="f-wallet-err"></div>
+            </div>
+
+            <!-- Network info -->
+            <div class="info-block">
+              <div class="info-row">
+                <span class="key">Network</span>
+                <span class="val">Base Mainnet (Chain 8453)</span>
+              </div>
+              <div class="info-row">
+                <span class="key">Token</span>
+                <span class="val">USDC — 6 decimals</span>
+              </div>
+              <div class="info-row">
+                <span class="key">Rate</span>
+                <span class="val">$1 = ₦1,250 + 2% fee</span>
+              </div>
+              <div class="info-row" style="border:none;">
+                <span class="key">Confirmations</span>
+                <span class="val">2 blocks (~6 sec)</span>
+              </div>
+            </div>
+
+          </div><!-- /form-card-inner -->
+
+          <div style="padding: 20px 32px; border-top: 1px solid var(--line); background: var(--bg3);">
+            <button type="submit" id="submit-btn" class="btn btn-primary">
+              <div class="btn-spin"></div>
+              <span class="btn-label">Generate Invoice →</span>
+            </button>
+            <p style="text-align:center; font-size:11px; color:var(--white30); font-family:var(--f-mono); margin-top:12px; letter-spacing:0.04em;">
+              Send exact USDC amount to avoid unmatched payment
+            </p>
+          </div>
+        </div><!-- /form-card -->
+      </form>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ WAITING ══════════════════════════ -->
+<section id="p-waiting" class="page">
+  <div class="waiting-page">
+    <div class="waiting-shell">
+
+      <!-- Pulse icon -->
+      <div class="pulse-ring-wrap">
+        <div class="pulse-ring">
+          <span class="pulse-icon">⚡</span>
+        </div>
+      </div>
+
+      <h2 class="waiting-title">AWAITING <em>PAYMENT</em></h2>
+      <p class="waiting-sub" id="w-orderid">REF: —</p>
+
+      <!-- Pay box -->
+      <div class="pay-box">
+        <div class="pay-box-header">
+          <span class="pay-box-title">⚠ Send EXACTLY this amount</span>
+          <div class="live-badge" style="background:transparent; border:none; padding:0;">
+            <div class="live-dot"></div>
+            <span style="font-size:10px;">Monitoring</span>
+          </div>
+        </div>
+        <div class="pay-box-body">
+          <div class="pay-amount-row">
+            <div>
+              <div style="font-family:var(--f-mono); font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:var(--white30); margin-bottom:6px;">USDC Amount</div>
+              <span class="pay-amount-val" id="w-amount">—</span>
+              <span class="pay-amount-unit"> USDC</span>
+            </div>
+            <button class="copy-btn" id="copy-amount" title="Copy amount">⧉</button>
+          </div>
+
+          <div style="font-family:var(--f-mono); font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:var(--white30); margin-bottom:8px;">Treasury Wallet (Base)</div>
+          <div class="copy-row">
+            <span class="copy-addr" id="w-wallet-addr">—</span>
+            <button class="copy-btn" id="copy-wallet" title="Copy address">⧉</button>
+          </div>
+
+          <div class="alert warn on" style="margin-top:16px; margin-bottom:0;">
+            <span class="alert-icon">⚠</span>
+            <span>Send from your registered wallet only. Wrong sender = unmatched payment.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress tracker -->
+      <div class="tracker">
+        <div class="tracker-title">// Transaction Progress</div>
+        <div class="track-steps">
+          <div class="track-step active" id="step-1">
+            <div class="track-dot"></div>
+            <div class="track-info">
+              <div class="track-name">Awaiting USDC Payment</div>
+              <div class="track-desc">Send exact amount on Base network</div>
+            </div>
+          </div>
+          <div class="track-step" id="step-2">
+            <div class="track-dot"></div>
+            <div class="track-info">
+              <div class="track-name">Payment Confirmed</div>
+              <div class="track-desc">2 block confirmations</div>
+            </div>
+          </div>
+          <div class="track-step" id="step-3">
+            <div class="track-dot"></div>
+            <div class="track-info">
+              <div class="track-name">Delivering Airtime</div>
+              <div class="track-desc">Calling Reloadly API</div>
+            </div>
+          </div>
+          <div class="track-step" id="step-4">
+            <div class="track-dot"></div>
+            <div class="track-info">
+              <div class="track-name">Complete</div>
+              <div class="track-desc">Airtime credited ✓</div>
+            </div>
+          </div>
+        </div>
+        <div class="tracker-status" id="tracker-status">Monitoring Base network...</div>
+      </div>
+
+      <!-- TX fallback -->
+      <div class="tx-fallback">
+        <div class="tx-fallback-label">// Already sent? Paste TX Hash (optional fallback)</div>
+        <div id="tx-alert" class="alert error" style="margin-bottom:12px;">
+          <span class="alert-icon">⚠</span>
+          <span class="alert-msg"></span>
+        </div>
+        <div class="tx-fallback-row">
+          <input type="text" id="tx-input" placeholder="0x transaction hash..."/>
+          <button class="btn btn-ghost btn-sm" id="tx-btn">
+            <span class="btn-label">Submit</span>
+          </button>
+        </div>
+        <p style="font-size:11px; color:var(--white30); font-family:var(--f-mono); margin-top:10px; letter-spacing:0.04em;">
+          Our listener auto-detects payments. Only paste if you've waited 3+ minutes.
+        </p>
+      </div>
+
+      <button class="btn btn-ghost" id="back-to-purchase">
+        <span class="btn-label">← Back to Form</span>
+      </button>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ SUCCESS ══════════════════════════ -->
+<section id="p-success" class="page">
+  <div class="result-page">
+    <div class="result-shell">
+
+      <div class="result-icon">
+        <div class="icon-circle success">
+          <svg class="check-svg" viewBox="0 0 36 36">
+            <path class="check-path" d="M7 18l7 8L29 10"/>
+          </svg>
+        </div>
+      </div>
+
+      <h2 class="result-title" style="color:var(--green);">AIRTIME SENT</h2>
+      <p class="result-sub">Your transaction completed successfully. Airtime has been credited.</p>
+
+      <div class="summary-card">
+        <div class="summary-card-head">// Transaction Summary</div>
+        <div class="summary-card-body">
+          <div class="summary-row">
+            <span class="sr-key">Phone</span>
+            <span class="sr-val" id="s-phone">—</span>
+          </div>
+          <div class="summary-row">
+            <span class="sr-key">Amount</span>
+            <span class="sr-val highlight" id="s-amount">—</span>
+          </div>
+          <div class="summary-row">
+            <span class="sr-key">Network</span>
+            <span class="sr-val" id="s-network">—</span>
+          </div>
+          <div class="summary-row">
+            <span class="sr-key">Paid</span>
+            <span class="sr-val" id="s-usdc">—</span>
+          </div>
+          <div class="summary-row">
+            <span class="sr-key">TX Hash</span>
+            <span class="sr-val" id="s-tx">—</span>
+          </div>
+          <div class="summary-row">
+            <span class="sr-key">Reloadly ID</span>
+            <span class="sr-val" id="s-reloadly">—</span>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" data-new-order style="margin-bottom:12px;">
+        <span class="btn-label">Buy More Airtime →</span>
+      </button>
+      <button class="btn btn-ghost" data-go="landing">
+        <span class="btn-label">Back to Home</span>
+      </button>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ FAILURE ══════════════════════════ -->
+<section id="p-failure" class="page">
+  <div class="result-page">
+    <div class="result-shell">
+
+      <div class="result-icon">
+        <div class="icon-circle fail">
+          <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+            <path d="M10 10l16 16M26 10L10 26" stroke="#ff2d2d" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
+
+      <h2 class="result-title" style="color:var(--red);">ORDER FAILED</h2>
+      <p class="result-sub">Something went wrong. Your USDC refund is being processed.</p>
+
+      <div class="summary-card" style="border-color:var(--red-border);">
+        <div class="summary-card-head" style="background:var(--red-subtle);">// Failure Details</div>
+        <div class="summary-card-body">
+          <div class="summary-row">
+            <span class="sr-key">Reason</span>
+            <span class="sr-val" id="f-reason" style="color:#ff8080;">—</span>
+          </div>
+          <div class="summary-row">
+            <span class="sr-key">Refund</span>
+            <span class="sr-val" id="f-refund">Processing...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="alert success on" style="margin-bottom:20px;">
+        <span class="alert-icon">↩</span>
+        <span>Your USDC is automatically refunded on-chain. Contact support if not received within 10 min.</span>
+      </div>
+
+      <button class="btn btn-primary" data-new-order style="margin-bottom:12px;">
+        <span class="btn-label">Try Again →</span>
+      </button>
+      <button class="btn btn-ghost" data-go="landing">
+        <span class="btn-label">Back to Home</span>
+      </button>
+
+    </div>
+  </div>
+</section>
+
+</div><!-- /root -->
+
+<script src="/js/app.js"></script>
+</body>
+</html>
